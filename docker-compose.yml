@@ -1,0 +1,52 @@
+version: "3"
+
+# More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
+services:
+  cloudflared:
+    container_name: cloudflared
+    image: cloudflare/cloudflared:latest
+    command: proxy-dns
+    restart: unless-stopped
+    environment:
+      # You can modify your upstream to be Google, Quad9, etc
+      - "TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query,https://1.0.0.1/dns-query,https://9.9.9.9/dns-query,https://149.112.112.9/dns-query"
+
+      # Listen on an unprivileged port
+      - "TUNNEL_DNS_PORT=5053"
+
+      # Listen on all interfaces
+      - "TUNNEL_DNS_ADDRESS=0.0.0.0"
+    ports:
+      - "5053:5053/udp"
+    
+    # You can't reference an upstream provider by name in pihole, so this is necessary.
+    networks:
+       piholenet:
+         ipv4_address: '172.19.0.3'
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    network_mode: host
+    environment:
+      TZ: 'America/Boise'
+      # TODO: Figure out how to do environment secrets in compose
+      WEBPASSWORD: 'specify_your_web_admin_password_here'
+      WEB_PORT: 8080
+    # Volumes store your data between container upgrades
+    volumes:
+      - './etc-pihole:/etc/pihole'
+      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+    cap_add:
+      - NET_ADMIN # Required if you are using Pi-hole as your DHCP server, else not needed
+    restart: unless-stopped
+
+# Describes a custom network on the default bridge, so cloudflare can get a predictable IP
+networks:
+  piholenet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.19.0.0/24

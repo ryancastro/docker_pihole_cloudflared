@@ -1,0 +1,4 @@
+start_local_pihole
+stop_local_pihole
+etc-pihole/
+etc-dnsmasq.d/
